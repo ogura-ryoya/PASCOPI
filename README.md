@@ -46,7 +46,7 @@ file10.txt
 
 1. AutoHotkey v2のセットアップファイルを[ダウンロード](https://www.autohotkey.com/download/ahk-v2.exe)
 2. セットアップファイルを実行し、AutoHotkey v2をインストール
-3. `PASCOPI.ahk` を[ダウンロード](https://github.com/ogura-ryoya/PASCOPI/releases/download/v1.0.0/PASCOPI.ahk)
+3. `PASCOPI.ahk` を[ダウンロード](https://github.com/ogura-ryoya/PASCOPI/releases/download/v1.0.1/PASCOPI.ahk)
 4. `PASCOPI.ahk` を実行し、PASCOPIを起動
 
 タスクバーにある`^（隠れているインジケーターを表示します）`をクリックし、`H (PASCOPI.ahk)` のアイコンが表示されていれば起動成功
