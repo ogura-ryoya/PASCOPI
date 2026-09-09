@@ -1,645 +1,350 @@
 ﻿#Requires AutoHotkey v2.0
 #SingleInstance Force
 
-
 ; ============================================================
+; PASCOPI
+;
 ; Explorerで Ctrl + Alt + C
 ;
 ; 1個選択
-;   ファイル → フルパス
-;   フォルダ → フルパス + \
+;   ファイル  → フルパス
+;   フォルダ  → フルパス + \
 ;
 ; 複数選択
 ;   現在のフォルダー + \
 ;   フォルダを上
 ;   ファイルを下
-;   同じ種類は自然順
+;   同じ種類は名前順
 ;
-; パスの \\?\ / \\?\UNC\ は通常形式に変換
-;
-; Windows 11 Explorerのタブにも対応
+; \\?\ / \\?\UNC\ は通常のWindowsパスへ変換
+; Windows 11 Explorerのタブに対応
 ; ============================================================
 
-^!c::
-{
-    CopyExplorerSelection()
-}
+^!c:: CopyExplorerSelection()
 
-
-CopyExplorerSelection()
-{
-    ; ========================================================
-    ; 現在のExplorer
-    ; ========================================================
-
+CopyExplorerSelection() {
     hwnd := WinExist("A")
 
-    if !hwnd
-    {
+    if !hwnd {
         ShowError("現在のウィンドウを取得できませんでした。")
         return
     }
 
-
     class := WinGetClass("ahk_id " hwnd)
 
-    if !(class = "CabinetWClass" || class = "ExploreWClass")
-    {
-        ShowError(
-            "現在のウィンドウはExplorerではありません。`n`n"
-            . "Class: " class
-        )
+    if class != "CabinetWClass" && class != "ExploreWClass" {
+        ShowError("現在のウィンドウはExplorerではありません。`n`nClass: " class)
         return
     }
 
-
-    ; ========================================================
+    ; --------------------------------------------------------
     ; Shell.Application
-    ; ========================================================
+    ; --------------------------------------------------------
 
-    try
-    {
-        shell := ComObject("Shell.Application")
-    }
-    catch as err
-    {
-        ShowError(
-            "Shell.Application の取得に失敗しました。`n`n"
-            . err.Message
-        )
+    try shell := ComObject("Shell.Application")
+    catch as err {
+        ShowError("Shell.Application の取得に失敗しました。`n`n" err.Message)
         return
     }
 
-
-    ; ========================================================
-    ; アクティブなExplorerのDocument取得
-    ; ========================================================
+    ; --------------------------------------------------------
+    ; 現在のExplorerタブ
+    ; --------------------------------------------------------
 
     document := GetExplorerDocument(shell, hwnd)
 
-    if !IsObject(document)
-    {
-        ShowError(
-            "現在のExplorerのDocumentを取得できませんでした。"
-        )
+    if !IsObject(document) {
+        ShowError("現在のExplorerタブを取得できませんでした。")
         return
     }
 
+    ; --------------------------------------------------------
+    ; 選択項目
+    ; --------------------------------------------------------
 
-    ; ========================================================
-    ; 選択項目取得
-    ; ========================================================
-
-    items := ""
-    count := -1
-    lastError := ""
-
-
-    Loop 10
-    {
-        try
-        {
-            items := document.SelectedItems
-            count := items.Count
-
-            if count > 0
-                break
-
-            Sleep 50
-        }
-        catch as err
-        {
-            lastError := err.Message
-            Sleep 50
-        }
+    try {
+        items := document.SelectedItems
+        selectedCount := items.Count
     }
-
-
-    ; ========================================================
-    ; 選択項目取得失敗
-    ; ========================================================
-
-    if count < 0
-    {
-        ShowError(
-            "選択項目の取得に失敗しました。`n`n"
-            . lastError
-        )
+    catch as err {
+        ShowError("選択項目の取得に失敗しました。`n`n" err.Message)
         return
     }
 
-
-    ; ========================================================
-    ; 選択なし
-    ; ========================================================
-
-    if count = 0
-    {
-        ShowError(
-            "Explorerは取得できましたが、選択項目が0個です。"
-        )
+    ; 選択なし → 何もしない
+    if selectedCount = 0
         return
-    }
-
 
     ; ========================================================
-    ; 1個だけ選択
-    ;
-    ; ファイル → フルパス
-    ; フォルダ → フルパス + \
+    ; 1個選択
     ; ========================================================
 
-    if count = 1
-    {
-        try
-        {
+    if selectedCount = 1 {
+        try {
             item := items.Item(0)
             path := NormalizePath(item.Path)
         }
-        catch as err
-        {
-            ShowError(
-                "選択項目のPath取得に失敗しました。`n`n"
-                . err.Message
-            )
+        catch as err {
+            ShowError("選択項目の取得に失敗しました。`n`n" err.Message)
             return
         }
 
-
-        if path = ""
-        {
-            ShowError(
-                "選択項目のPathが空でした。"
-            )
+        if path = "" {
+            ShowError("選択項目のPathが空でした。")
             return
         }
 
-
-        ; フォルダ判定
-        isFolder := IsFolderItem(item, path)
-
-
-        ; フォルダなら末尾に \
-        if isFolder
+        if IsFolderItem(item, path)
             path := AddFolderBackslash(path)
 
-
-        ; クリップボードへ
         CopyToClipboard(path)
-
         return
     }
 
-
     ; ========================================================
-    ; 現在のフォルダー
+    ; 複数選択
     ; ========================================================
 
-    try
-    {
-        folderPath := NormalizePath(
-            document.Folder.Self.Path
-        )
-    }
-    catch as err
-    {
-        ShowError(
-            "現在のフォルダーのPath取得に失敗しました。`n`n"
-            . err.Message
-        )
+    try folderPath := NormalizePath(document.Folder.Self.Path)
+    catch as err {
+        ShowError("現在のフォルダーのPath取得に失敗しました。`n`n" err.Message)
         return
     }
 
-
-    if folderPath = ""
-    {
-        ShowError(
-            "現在のフォルダーPathが空です。"
-        )
+    if folderPath = "" {
+        ShowError("現在のフォルダーPathが空です。")
         return
     }
-
-
-    ; ========================================================
-    ; 選択項目を取得
-    ; ========================================================
 
     entries := []
 
-
-    try
-    {
-        for item in items
-        {
-            try
-            {
+    try {
+        for item in items {
+            try {
                 path := NormalizePath(item.Path)
 
                 if path = ""
                     continue
 
-
                 SplitPath(path, &name)
-
-
-                ; フォルダ判定
-                isFolder := IsFolderItem(item, path)
-
 
                 entries.Push({
                     name: name,
-                    path: path,
-                    isFolder: isFolder
+                    isFolder: IsFolderItem(item, path)
                 })
             }
-            catch
-            {
-                ; 個別項目で取得できない場合はスキップ
-                continue
-            }
         }
     }
-    catch as err
-    {
-        ShowError(
-            "選択項目の列挙中にエラーが発生しました。`n`n"
-            . err.Message
-        )
+    catch as err {
+        ShowError("選択項目の取得中にエラーが発生しました。`n`n" err.Message)
         return
     }
 
-
-    if entries.Length = 0
-    {
-        ShowError(
-            "選択項目を取得できませんでした。"
-        )
+    if entries.Length = 0 {
+        ShowError("選択項目を取得できませんでした。")
         return
     }
 
+    ; 名前順ソート
+    SortEntries(entries)
 
-    ; ========================================================
-    ; ソート
-    ;
-    ; 1. フォルダ
-    ; 2. ファイル
-    ;
-    ; 同じ種類なら自然順
-    ;
-    ; file1
-    ; file2
-    ; file10
-    ; ========================================================
+    ; 現在のフォルダー
+    result := AddFolderBackslash(folderPath)
 
-    count := entries.Length
-
-
-    Loop count
-    {
-        swapped := false
-
-
-        Loop count - 1
-        {
-            i := A_Index
-
-            current := entries[i]
-            next := entries[i + 1]
-
-
-            ; --------------------------------------------
-            ; フォルダをファイルより上へ
-            ; --------------------------------------------
-
-            if !current.isFolder && next.isFolder
-            {
-                temp := entries[i]
-
-                entries[i] := entries[i + 1]
-                entries[i + 1] := temp
-
-                swapped := true
-
-                continue
-            }
-
-
-            ; --------------------------------------------
-            ; 同じ種類なら自然順
-            ; --------------------------------------------
-
-            if current.isFolder = next.isFolder
-            {
-                try
-                {
-                    compareResult := DllCall(
-                        "Shlwapi\StrCmpLogicalW",
-                        "Str", current.name,
-                        "Str", next.name,
-                        "Int"
-                    )
-                }
-                catch
-                {
-                    compareResult := (
-                        current.name > next.name
-                            ? 1
-                            : current.name < next.name
-                                ? -1
-                                : 0
-                    )
-                }
-
-
-                if compareResult > 0
-                {
-                    temp := entries[i]
-
-                    entries[i] := entries[i + 1]
-                    entries[i + 1] := temp
-
-                    swapped := true
-                }
-            }
-        }
-
-
-        if !swapped
-            break
-    }
-
-
-    ; ========================================================
-    ; 結果作成
-    ;
-    ; 現在のフォルダーもフォルダーなので \
-    ; ========================================================
-
-    result := AddFolderBackslash(folderPath) . "`r`n"
-
-
-    for entry in entries
-    {
+    ; 選択項目
+    for entry in entries {
         name := entry.name
-
-
-        ; --------------------------------------------
-        ; フォルダなら末尾に \
-        ; --------------------------------------------
 
         if entry.isFolder
             name := AddFolderBackslash(name)
 
-
-        result .= name . "`r`n"
+        result .= "`r`n" name
     }
-
-
-    ; 最後の改行を削除
-    result := RTrim(result, "`r`n")
-
-
-    ; ========================================================
-    ; クリップボードへ
-    ; ========================================================
 
     CopyToClipboard(result)
 }
 
-
 ; ============================================================
-; パスを通常のWindows形式に変換
-;
-; \\?\UNC\server\share\...
-;       ↓
-; \\server\share\...
-;
-; \\?\C:\...
-;       ↓
-; C:\...
+; Explorerの現在のタブのDocumentを取得
 ; ============================================================
 
-NormalizePath(path)
-{
-    ; \\?\UNC\ → \\server\share\
-    if SubStr(path, 1, 8) = "\\?\UNC\"
-        return "\\" . SubStr(path, 9)
+GetExplorerDocument(shell, hwnd) {
+    static IID_IShellBrowser :=
+        "{000214E2-0000-0000-C000-000000000046}"
 
+    ; Win11 Explorerのタブ
+    try activeTab := ControlGetHwnd(
+        "ShellTabWindowClass1",
+        "ahk_id " hwnd
+    )
+    catch
+        activeTab := 0
 
-    ; \\?\C:\ → C:\
-    if SubStr(path, 1, 4) = "\\?\"
-        return SubStr(path, 5)
+    for window in shell.Windows {
+        try {
+            if window.HWND != hwnd
+                continue
 
+            ; タブが存在しない場合
+            if !activeTab
+                return window.Document
 
-    return path
+            ; 現在のタブを特定
+            shellBrowser := ComObjQuery(
+                window,
+                IID_IShellBrowser,
+                IID_IShellBrowser
+            )
+
+            if !shellBrowser
+                continue
+
+            currentTab := 0
+
+            ; IShellBrowser::GetControlWindow
+            ComCall(
+                3,
+                shellBrowser,
+                "Int*",
+                &currentTab
+            )
+
+            if currentTab = activeTab
+                return window.Document
+        }
+        catch {
+            continue
+        }
+    }
+
+    return ""
 }
-
 
 ; ============================================================
 ; フォルダ判定
 ; ============================================================
 
-IsFolderItem(item, path)
-{
-    attributes := FileExist(path)
-
-
-    ; 実在するフォルダ
-    if InStr(attributes, "D")
-        return true
-
-
-    ; 特殊なExplorer項目などへのフォールバック
-    try
-    {
-        itemType := item.Type
-
-        if InStr(itemType, "フォルダー")
-            || InStr(itemType, "Folder")
-        {
+IsFolderItem(item, path) {
+    ; Shellによる判定を優先
+    try {
+        if item.IsFolder
             return true
-        }
     }
-    catch
-    {
+    catch {
     }
 
-
-    return false
+    ; 通常のファイルシステム
+    return InStr(FileExist(path), "D") != 0
 }
 
-
 ; ============================================================
-; フォルダ末尾に \ を追加
-; ============================================================
-
-AddFolderBackslash(path)
-{
-    return RTrim(path, "\") . "\"
-}
-
-
-; ============================================================
-; ExplorerのDocument取得
+; 名前順ソート
 ;
-; Windows 11 Explorerのタブに対応
+; フォルダ
+; ↓
+; ファイル
+;
+; file1
+; file2
+; file10
 ; ============================================================
 
-GetExplorerDocument(shell, hwnd)
-{
-    static IID_IShellBrowser :=
-        "{000214E2-0000-0000-C000-000000000046}"
+SortEntries(entries) {
+    entryCount := entries.Length
 
+    loop entryCount - 1 {
+        swapped := false
 
-    ; --------------------------------------------------------
-    ; アクティブなExplorerタブ
-    ; --------------------------------------------------------
+        loop entryCount - A_Index {
+            i := A_Index
 
-    activeTab := 0
+            a := entries[i]
+            b := entries[i + 1]
 
-
-    try
-    {
-        activeTab := ControlGetHwnd(
-            "ShellTabWindowClass1",
-            "ahk_id " hwnd
-        )
-    }
-    catch
-    {
-        activeTab := 0
-    }
-
-
-    ; --------------------------------------------------------
-    ; Shell.ApplicationのExplorer一覧
-    ; --------------------------------------------------------
-
-    try
-    {
-        for window in shell.Windows
-        {
-            try
-            {
-                ; 別Explorerは無視
-                if window.HWND != hwnd
-                    continue
-
-
-                ; ------------------------------------------------
-                ; Windows 11のタブを確認
-                ; ------------------------------------------------
-
-                if activeTab
-                {
-                    try
-                    {
-                        shellBrowser := ComObjQuery(
-                            window,
-                            IID_IShellBrowser,
-                            IID_IShellBrowser
-                        )
-
-
-                        if !shellBrowser
-                            continue
-
-
-                        currentTab := 0
-
-
-                        ; IShellBrowser::GetControlWindow
-                        ComCall(
-                            3,
-                            shellBrowser,
-                            "Int*",
-                            &currentTab
-                        )
-
-
-                        if currentTab != activeTab
-                            continue
-                    }
-                    catch
-                    {
-                        ; タブ判定に失敗した場合は
-                        ; 通常のDocumentを使用
-                    }
-                }
-
-
-                document := window.Document
-
-
-                if IsObject(document)
-                    return document
-            }
-            catch
-            {
+            ; フォルダを上へ
+            if !a.isFolder && b.isFolder {
+                entries[i] := b
+                entries[i + 1] := a
+                swapped := true
                 continue
             }
+
+            ; 同じ種類 → 名前順
+            if a.isFolder = b.isFolder {
+                compare := DllCall(
+                    "Shlwapi\StrCmpLogicalW",
+                    "Str", a.name,
+                    "Str", b.name,
+                    "Int"
+                )
+
+                if compare > 0 {
+                    entries[i] := b
+                    entries[i + 1] := a
+                    swapped := true
+                }
+            }
         }
-    }
-    catch
-    {
-        return ""
-    }
 
-
-    return ""
+        if !swapped
+            break
+    }
 }
 
+; ============================================================
+; \\?\ を通常形式へ
+; ============================================================
+
+NormalizePath(path) {
+    if SubStr(path, 1, 8) = "\\?\UNC\"
+        return "\\" SubStr(path, 9)
+
+    if SubStr(path, 1, 4) = "\\?\"
+        return SubStr(path, 5)
+
+    return path
+}
+
+; ============================================================
+; フォルダ末尾に \
+; ============================================================
+
+AddFolderBackslash(path) {
+    return RTrim(path, "\") "\"
+}
 
 ; ============================================================
 ; クリップボードへコピー
 ; ============================================================
 
-CopyToClipboard(text)
-{
-    try
-    {
-        ; 古い内容をクリア
+CopyToClipboard(text) {
+    try {
         A_Clipboard := ""
-
-
-        ; 新しい内容をセット
         A_Clipboard := text
 
-
-        ; 反映確認
-        if !ClipWait(1)
-        {
-            ShowError(
-                "クリップボードへのコピーに失敗しました。"
-            )
-
+        if !ClipWait(1) {
+            ShowError("クリップボードへのコピーに失敗しました。")
             return false
         }
 
-
         return true
     }
-    catch as err
-    {
+    catch as err {
         ShowError(
             "クリップボードへのコピー中にエラーが発生しました。`n`n"
-            . err.Message
+            err.Message
         )
-
         return false
     }
 }
-
 
 ; ============================================================
 ; エラー表示
 ; ============================================================
 
-ShowError(message)
-{
+ShowError(message) {
     MsgBox(
-        "❌ Explorer Copy エラー`n`n"
-        . message,
-        "Explorer Copy"
+        "❌ PASCOPI エラー`n`n" message,
+        "PASCOPI"
     )
 }
