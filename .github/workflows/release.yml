@@ -21,19 +21,30 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+        # autohotkey.com は Cloudflare のチェックで弾かれるため GitHub のリリースから取得する
         run: |
-          Invoke-WebRequest https://www.autohotkey.com/download/ahk-v2.zip -OutFile ahk.zip
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tag = (gh release list --repo AutoHotkey/AutoHotkey --exclude-pre-releases --limit 20 --json tagName |
+            ConvertFrom-Json | Where-Object { $_.tagName -like 'v2.*' } | Select-Object -First 1).tagName
+          if (-not $tag) { throw "AutoHotkey v2 のリリースが見つかりません" }
+          Write-Host "AutoHotkey $tag"
+          gh release download $tag --repo AutoHotkey/AutoHotkey --pattern "AutoHotkey_*.zip" --output ahk.zip
           Expand-Archive ahk.zip -DestinationPath ahk
+
           gh release download --repo AutoHotkey/Ahk2Exe --pattern "Ahk2Exe*.zip" --output ahk2exe.zip
           Expand-Archive ahk2exe.zip -DestinationPath ahk2exe
 
       - name: Build PASCOPI.exe
         shell: pwsh
         run: |
-          $proc = Start-Process ahk2exe\Ahk2Exe.exe -Wait -PassThru -ArgumentList @(
+          $ahk2exe = (Get-ChildItem ahk2exe -Recurse -Filter Ahk2Exe.exe | Select-Object -First 1).FullName
+          $base = (Get-ChildItem ahk -Recurse -Filter AutoHotkey64.exe | Select-Object -First 1).FullName
+          if (-not $ahk2exe -or -not $base) { throw "Ahk2Exe.exe または AutoHotkey64.exe が見つかりません" }
+
+          $proc = Start-Process $ahk2exe -Wait -PassThru -ArgumentList @(
             '/in', 'PASCOPI.ahk',
             '/out', 'PASCOPI.exe',
-            '/base', 'ahk\AutoHotkey64.exe',
+            '/base', "`"$base`"",
             '/silent', 'verbose'
           )
           if ($proc.ExitCode -ne 0 -or -not (Test-Path PASCOPI.exe)) {
