@@ -3,10 +3,10 @@
 
 ;@Ahk2Exe-SetName PASCOPI
 ;@Ahk2Exe-SetDescription PASCOPI
-;@Ahk2Exe-SetVersion 1.2.2
+;@Ahk2Exe-SetVersion 1.2.3
 
 ; リリース時に GitHub Actions がタグのバージョンで上書きする
-VERSION := "1.2.2"
+VERSION := "1.2.3"
 
 ; ============================================================
 ; PASCOPI
@@ -344,7 +344,7 @@ HideToolTip() {
 
 SetupTrayMenu() {
     static ENABLE_MENU := "有効", EXIT_MENU := "終了"
-    versionMenu := "v" VERSION
+    versionMenu := "PASCOPI v" VERSION
 
     ; 標準の項目（Reload / Exit など）は使わない
     A_TrayMenu.Delete()

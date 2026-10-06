@@ -65,7 +65,7 @@ Microsoft Edge.lnk
 
 | メニュー | 動作 |
 | --- | --- |
-| vX.X.X | バージョン表示 |
+| PASCOPI vX.X.X | 名前とバージョンの表示 |
 | 有効 | `Ctrl + Alt + C` のON / OFFを切り替え |
 | 終了 | 自動起動を解除して終了 |
 
