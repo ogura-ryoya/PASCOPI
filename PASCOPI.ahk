@@ -3,10 +3,10 @@
 
 ;@Ahk2Exe-SetName PASCOPI
 ;@Ahk2Exe-SetDescription PASCOPI
-;@Ahk2Exe-SetVersion 1.2.1
+;@Ahk2Exe-SetVersion 1.2.2
 
 ; リリース時に GitHub Actions がタグのバージョンで上書きする
-VERSION := "1.2.1"
+VERSION := "1.2.2"
 
 ; ============================================================
 ; PASCOPI
@@ -25,7 +25,6 @@ VERSION := "1.2.1"
 ;   ※ 親フォルダーが異なる場合（デスクトップ・検索結果など）は
 ;     親フォルダーごとにまとめ、空行で区切る（1件だけならフルパス）
 ;
-; \\?\ / \\?\UNC\ は通常のWindowsパスへ変換
 ; Windows 11 Explorerのタブに対応
 ;
 ; 起動するとWindows起動時の自動起動を登録
@@ -35,7 +34,6 @@ VERSION := "1.2.1"
 ; ============================================================
 
 GroupAdd("Explorer", "ahk_class CabinetWClass")
-GroupAdd("Explorer", "ahk_class ExploreWClass")
 
 GroupAdd("Desktop", "ahk_class Progman")
 GroupAdd("Desktop", "ahk_class WorkerW")
@@ -78,11 +76,11 @@ GetSelectedEntries(hwnd) {
     entries := []
 
     for item in items {
-        path := NormalizePath(item.Path)
+        path := item.Path
 
         ; ごみ箱などの仮想項目（::{GUID}）はパスを持たないため除外
         if path != "" && SubStr(path, 1, 2) != "::"
-            entries.Push({ path: path, isFolder: IsFolderItem(item, path) })
+            entries.Push({ path: path, isFolder: IsFolder(path) })
     }
 
     if items.Count > 0 && entries.Length = 0
@@ -229,15 +227,10 @@ GetDesktopDocument() {
 ; フォルダ判定
 ; ============================================================
 
-IsFolderItem(item, path) {
-    ; ファイルシステム上の項目は属性で判定
-    ; （Shellの IsFolder は .zip も true を返すため）
-    if attributes := FileExist(path)
-        return InStr(attributes, "D") != 0
-
-    ; ファイルシステム外の項目は Shell の判定に従う
-    try return item.IsFolder
-    return false
+; ファイルの属性で判定
+; （Shellの IsFolder は .zip も true を返すため使わない）
+IsFolder(path) {
+    return InStr(FileExist(path), "D") != 0
 }
 
 ; ============================================================
@@ -294,20 +287,6 @@ CompareEntries(a, b) {
 ; Explorerと同じ自然順（file2 < file10）
 StrCmpLogical(a, b) {
     return DllCall("Shlwapi\StrCmpLogicalW", "Str", a, "Str", b, "Int")
-}
-
-; ============================================================
-; \\?\ を通常形式へ
-; ============================================================
-
-NormalizePath(path) {
-    if SubStr(path, 1, 8) = "\\?\UNC\"
-        return "\\" SubStr(path, 9)
-
-    if SubStr(path, 1, 4) = "\\?\"
-        return SubStr(path, 5)
-
-    return path
 }
 
 ; ============================================================
@@ -377,7 +356,6 @@ SetupTrayMenu() {
     A_TrayMenu.Add(EXIT_MENU, ExitPascopi)
 
     A_TrayMenu.Check(ENABLE_MENU)
-    A_TrayMenu.Default := ENABLE_MENU  ; アイコンのダブルクリックでも切り替え
     A_IconTip := "PASCOPI"
 
     try CreateStartupShortcut()
