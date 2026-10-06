@@ -1,26 +1,17 @@
 # PASCOPI
 
-Windows Explorerのファイル・フォルダのパスを整形してコピーするAutoHotkey v2スクリプト
+Explorerやデスクトップで選択したファイル・フォルダのパスを、`Ctrl + Alt + C` で整形してコピーするWindows用ツール
 
-## できること
+## コピーされる形式
 
-Explorerでファイルやフォルダを選択し、`Ctrl + Alt + C` を押すとパスをクリップボードにコピー
-
-### ファイルを1つ選択
+### 1つ選択
 
 ```text
 C:\Users\ユーザー名\Documents\sample.txt
-```
-
-ファイルのフルパスをコピー
-
-### フォルダを1つ選択
-
-```text
 C:\Users\ユーザー名\Documents\SampleFolder\
 ```
 
-フォルダのフルパスをコピー、末尾に `\` を付加
+フルパスをコピー（フォルダは末尾に `\` を付加）
 
 ### 複数選択
 
@@ -33,12 +24,9 @@ file2.txt
 file10.txt
 ```
 
-* 親フォルダを先頭に追加
-* フォルダを上に配置
-* ファイルを下に配置
-* 同じ種類はExplorerと同じ名前順（`file2` → `file10`）でソート
+親フォルダの下に、フォルダ → ファイルの順、名前順（`file2` → `file10`）で並べる
 
-デスクトップや検索結果などで親フォルダが異なる項目を複数選択した場合は、親フォルダごとにまとめて空行で区切る
+デスクトップや検索結果などで親フォルダが異なる場合は、親フォルダごとにまとめて空行で区切る
 
 ```text
 C:\Users\ユーザー名\Desktop\
@@ -50,63 +38,44 @@ Google Chrome.lnk
 Microsoft Edge.lnk
 ```
 
-親フォルダに1件しかない項目は、フルパスで続けて並べる
+## インストール
 
-```text
-C:\Users\ユーザー名\Documents\report.docx
-C:\Users\ユーザー名\Downloads\image.png
-```
-
-### 共通
-
-* `\\?\` / `\\?\UNC\` 形式のパスを通常形式に変換
-* Windows 11 Explorerのタブに対応（表示中のタブの選択項目をコピー）
-* デスクトップ上の選択にも対応
-* コピーするとマウスの近くに「📋 コピーしました」と1秒表示
-* `.zip` はファイルとして扱う（末尾に `\` を付けない）
-* Explorer・デスクトップ以外のウィンドウでは `Ctrl + Alt + C` を横取りしない
-
-## 使い方
-
-### 起動
+動作環境：Windows 10 / 11
 
 1. `PASCOPI.exe` を[ダウンロード](https://github.com/ogura-ryoya/PASCOPI/releases/latest/download/PASCOPI.exe)
-2. `PASCOPI.exe` を好きな場所に置いて実行
+2. 好きな場所に置いて実行
 
-AutoHotkeyのインストールは不要
+起動すると、Windows起動時に自動で起動するよう登録される
 
-タスクバーにある`^（隠れているインジケーターを表示します）`をクリックし、`H` のアイコン（PASCOPI）が表示されていれば起動成功
+### 初回起動時の警告について
+
+* 「WindowsによってPCが保護されました」と表示された場合は、「詳細情報」→「実行」をクリック
+* AutoHotkeyで作成したexeは、ウイルス対策ソフトに誤って検出されることがある。その場合は `.ahk` 版（下記）を使用
 
 <details>
-<summary>AutoHotkey v2 をインストール済みの場合（.ahk 版）</summary>
+<summary>.ahk 版（AutoHotkey v2 をインストール済みの場合）</summary>
 
-1. `PASCOPI.ahk` を[ダウンロード](https://github.com/ogura-ryoya/PASCOPI/releases/latest/download/PASCOPI.ahk)
-2. `PASCOPI.ahk` を実行
+`PASCOPI.ahk` を[ダウンロード](https://github.com/ogura-ryoya/PASCOPI/releases/latest/download/PASCOPI.ahk)して実行
 
 </details>
 
-### 実行
+## タスクトレイのメニュー
 
-Explorerやデスクトップでファイルやフォルダを選択し、`Ctrl + Alt + C` で実行
+タスクトレイの PASCOPI アイコン（`H`）を右クリック
 
-### Windows起動時に自動起動
+| メニュー | 動作 |
+| --- | --- |
+| PASCOPI vX.X.X | バージョン表示 |
+| 有効 | `Ctrl + Alt + C` のON / OFFを切り替え（アイコンのダブルクリックでも可） |
+| 終了 | 自動起動を解除して終了 |
 
-PASCOPIを一度起動すると、Windows起動時に自動で起動するよう登録される（設定は不要）
+## アンインストール
 
-* 解除したい場合は、タスクトレイの PASCOPI アイコンを右クリックし、「Windows起動時に自動起動」のチェックを外す
-* もう一度クリックすると再登録
-* PASCOPIを別の場所へ移動した場合も、移動先で一度起動すれば登録先が自動で更新される
+タスクトレイのメニューから「終了」を選び、`PASCOPI.exe` を削除
 
-## 開発者向け：リリース手順
+## リリース手順（開発者向け）
 
-GitHubでリリースを公開すると、GitHub Actions（`.github/workflows/release.yml`）が `PASCOPI.exe` をビルドし、`PASCOPI.ahk` と一緒にリリースへ自動で添付する
+1. `PASCOPI.ahk` 先頭のバージョン（`;@Ahk2Exe-SetVersion` と `VERSION :=` の2か所）を更新してコミット
+2. `v1.2.0` のような形式のタグでGitHubのリリースを公開
 
-## 補足：Windows標準の「パスのコピー」との違い
-
-Windows 11には標準で `Ctrl + Shift + C`（右クリック →「パスのコピー」）がある
-
-| | Windows標準 | PASCOPI |
-| --- | --- | --- |
-| 1個選択 | `"C:\...\sample.txt"`（ダブルクォート付き） | `C:\...\sample.txt` |
-| フォルダ | 末尾 `\` なし | 末尾 `\` あり |
-| 複数選択 | 全項目をフルパスで列挙 | 親フォルダ + 項目名、フォルダ優先の名前順 |
+GitHub Actionsがタグのバージョンを埋め込んだ `PASCOPI.exe` をビルドし、`PASCOPI.ahk` と一緒にリリースへ添付する

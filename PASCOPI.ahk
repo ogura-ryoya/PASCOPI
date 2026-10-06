@@ -3,6 +3,10 @@
 
 ;@Ahk2Exe-SetName PASCOPI
 ;@Ahk2Exe-SetDescription PASCOPI
+;@Ahk2Exe-SetVersion 1.2.0
+
+; リリース時に GitHub Actions がタグのバージョンで上書きする
+VERSION := "1.2.0"
 
 ; ============================================================
 ; PASCOPI
@@ -25,7 +29,9 @@
 ; Windows 11 Explorerのタブに対応
 ;
 ; 起動するとWindows起動時の自動起動を登録
-; （タスクトレイのメニューから解除可能）
+; タスクトレイのメニュー
+;   有効 … ON / OFF の切り替え
+;   終了 … 自動起動を解除して終了
 ; ============================================================
 
 GroupAdd("Explorer", "ahk_class CabinetWClass")
@@ -64,7 +70,7 @@ CopyExplorerSelection() {
 ; ============================================================
 
 GetSelectedEntries(hwnd) {
-    document := WinActive("ahk_group Desktop")
+    document := WinExist("ahk_group Desktop ahk_id " hwnd)
         ? GetDesktopDocument()
         : GetExplorerDocument(hwnd)
 
@@ -150,10 +156,10 @@ GroupByParent(entries) {
         index[parent].entries.Push(entry)
     }
 
-    InsertionSort(groups, (a, b) => StrCmpLogical(a.parent, b.parent))
+    groups := MergeSort(groups, (a, b) => StrCmpLogical(a.parent, b.parent))
 
     for group in groups
-        InsertionSort(group.entries, CompareEntries)
+        group.entries := MergeSort(group.entries, CompareEntries)
 
     return groups
 }
@@ -235,7 +241,7 @@ IsFolderItem(item, path) {
 }
 
 ; ============================================================
-; 並び替え（挿入ソート）
+; 並び替え（マージソート）
 ;
 ; フォルダ
 ; ↓
@@ -246,18 +252,36 @@ IsFolderItem(item, path) {
 ; file10
 ; ============================================================
 
-InsertionSort(items, compare) {
-    loop items.Length - 1 {
-        current := items[A_Index + 1]
-        i := A_Index
+; 並び替えた新しい配列を返す（大量に選択しても高速）
+MergeSort(items, compare) {
+    return MergeSortRange(items, compare, 1, items.Length)
+}
 
-        while i >= 1 && compare(items[i], current) > 0 {
-            items[i + 1] := items[i]
-            i--
-        }
+MergeSortRange(items, compare, first, last) {
+    if first > last
+        return []
 
-        items[i + 1] := current
-    }
+    if first = last
+        return [items[first]]
+
+    middle := (first + last) // 2
+    left := MergeSortRange(items, compare, first, middle)
+    right := MergeSortRange(items, compare, middle + 1, last)
+
+    ; 並び替え済みの左右を、先頭から小さい順に取り出してつなぐ
+    result := []
+    i := 1, j := 1
+
+    while i <= left.Length && j <= right.Length
+        result.Push(compare(left[i], right[j]) <= 0 ? left[i++] : right[j++])
+
+    while i <= left.Length
+        result.Push(left[i++])
+
+    while j <= right.Length
+        result.Push(right[j++])
+
+    return result
 }
 
 CompareEntries(a, b) {
@@ -299,11 +323,19 @@ AddFolderBackslash(path) {
 ; ============================================================
 
 CopyToClipboard(text) {
-    A_Clipboard := ""
-    A_Clipboard := text
+    saved := ClipboardAll()
 
-    if !ClipWait(1)
-        throw Error("クリップボードへのコピーに失敗しました。")
+    try {
+        A_Clipboard := ""
+        A_Clipboard := text
+
+        if ClipWait(1)
+            return
+    }
+
+    ; 失敗したら元の中身に戻す
+    try A_Clipboard := saved
+    throw Error("クリップボードへのコピーに失敗しました。")
 }
 
 ; ============================================================
@@ -312,70 +344,64 @@ CopyToClipboard(text) {
 
 ShowCopied(count) {
     ToolTip("📋 コピーしました" (count > 1 ? "（" count "件）" : ""))
-    SetTimer(() => ToolTip(), -1000)
+
+    ; 同じ関数を指定するとタイマーがリセットされ、最後のコピーから1秒表示される
+    SetTimer(HideToolTip, -1000)
+}
+
+HideToolTip() {
+    ToolTip()
 }
 
 ; ============================================================
 ; タスクトレイのメニュー / 自動起動
 ;
-; 初期設定は自動起動ON
+; 有効  … チェックでON / OFF（OFF中は Ctrl + Alt + C を無効化）
+; 終了  … 自動起動を解除して終了
+;
 ; 起動するたびにスタートアップフォルダのショートカットを
 ; 現在の場所へ作成（移動した場合も追従）
-;
-; 「Windows起動時に自動起動」でON / OFFを切り替え
-; OFFにした場合は設定ファイルに保存し、再登録しない
 ; ============================================================
 
 SetupTrayMenu() {
-    static STARTUP_MENU := "Windows起動時に自動起動"
+    static ENABLE_MENU := "有効", EXIT_MENU := "終了"
+    versionMenu := "PASCOPI " VersionText()
 
-    A_IconTip := "PASCOPI（Ctrl + Alt + C）"
-    A_TrayMenu.Insert("1&", STARTUP_MENU, ToggleStartup)
-    A_TrayMenu.Insert("2&")
+    ; 標準の項目（Reload / Exit など）は使わない
+    A_TrayMenu.Delete()
+    A_TrayMenu.Add(versionMenu, (*) => 0)
+    A_TrayMenu.Disable(versionMenu)
+    A_TrayMenu.Add()
+    A_TrayMenu.Add(ENABLE_MENU, ToggleEnabled)
+    A_TrayMenu.Add()
+    A_TrayMenu.Add(EXIT_MENU, ExitPascopi)
 
-    if !IsAutoStartEnabled()
-        return
+    A_TrayMenu.Check(ENABLE_MENU)
+    A_TrayMenu.Default := ENABLE_MENU  ; アイコンのダブルクリックでも切り替え
+    UpdateIconTip()
 
-    try {
-        CreateStartupShortcut()
-        A_TrayMenu.Check(STARTUP_MENU)
-    }
-    catch as err {
+    try CreateStartupShortcut()
+    catch as err
         ShowError("自動起動の登録に失敗しました。`n`n" err.Message)
-    }
 }
 
-ToggleStartup(itemName, *) {
-    try {
-        if IsAutoStartEnabled() {
-            if FileExist(StartupShortcutPath())
-                FileDelete(StartupShortcutPath())
-            SetAutoStartEnabled(false)
-            A_TrayMenu.Uncheck(itemName)
-        }
-        else {
-            CreateStartupShortcut()
-            SetAutoStartEnabled(true)
-            A_TrayMenu.Check(itemName)
-        }
-    }
-    catch as err {
-        ShowError("自動起動の設定に失敗しました。`n`n" err.Message)
-    }
+ToggleEnabled(itemName, *) {
+    Suspend(-1)
+    A_TrayMenu.ToggleCheck(itemName)
+    UpdateIconTip()
 }
 
-; 設定は %AppData%\PASCOPI\settings.ini に保存
-SettingsPath() {
-    return A_AppData "\PASCOPI\settings.ini"
+UpdateIconTip() {
+    A_IconTip := "PASCOPI " VersionText() (A_IsSuspended ? "（無効）" : "")
 }
 
-IsAutoStartEnabled() {
-    return IniRead(SettingsPath(), "Settings", "AutoStart", "1") = "1"
+VersionText() {
+    return "v" VERSION
 }
 
-SetAutoStartEnabled(enabled) {
-    DirCreate(A_AppData "\PASCOPI")
-    IniWrite(enabled ? "1" : "0", SettingsPath(), "Settings", "AutoStart")
+ExitPascopi(*) {
+    try FileDelete(StartupShortcutPath())
+    ExitApp()
 }
 
 StartupShortcutPath() {
