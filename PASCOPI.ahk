@@ -3,10 +3,10 @@
 
 ;@Ahk2Exe-SetName PASCOPI
 ;@Ahk2Exe-SetDescription PASCOPI
-;@Ahk2Exe-SetVersion 1.2.0
+;@Ahk2Exe-SetVersion 1.2.1
 
 ; リリース時に GitHub Actions がタグのバージョンで上書きする
-VERSION := "1.2.0"
+VERSION := "1.2.1"
 
 ; ============================================================
 ; PASCOPI
