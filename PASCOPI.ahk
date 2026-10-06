@@ -365,7 +365,7 @@ HideToolTip() {
 
 SetupTrayMenu() {
     static ENABLE_MENU := "有効", EXIT_MENU := "終了"
-    versionMenu := "PASCOPI " VersionText()
+    versionMenu := "v" VERSION
 
     ; 標準の項目（Reload / Exit など）は使わない
     A_TrayMenu.Delete()
@@ -378,7 +378,7 @@ SetupTrayMenu() {
 
     A_TrayMenu.Check(ENABLE_MENU)
     A_TrayMenu.Default := ENABLE_MENU  ; アイコンのダブルクリックでも切り替え
-    UpdateIconTip()
+    A_IconTip := "PASCOPI"
 
     try CreateStartupShortcut()
     catch as err
@@ -388,15 +388,6 @@ SetupTrayMenu() {
 ToggleEnabled(itemName, *) {
     Suspend(-1)
     A_TrayMenu.ToggleCheck(itemName)
-    UpdateIconTip()
-}
-
-UpdateIconTip() {
-    A_IconTip := "PASCOPI " VersionText() (A_IsSuspended ? "（無効）" : "")
-}
-
-VersionText() {
-    return "v" VERSION
 }
 
 ExitPascopi(*) {
